@@ -1,0 +1,96 @@
+version: '3'
+services:  
+  mysql:    
+    build: ./requirements/mariadb
+    volumes:      
+        - db:/var/lib/mysql 
+        #- /data/mysql:/var/lib/mysql    
+    environment:      
+        MYSQL_ROOT_PASSWORD: $MYSQL_ROOT_PASSWORD      
+        MYSQL_DATABASE:      $MYSQL_DATABASE
+        MYSQL_USER:          $MYSQL_USER
+        MYSQL_PASSWORD:      $MYSQL_PASSWORD
+    restart: always  
+    networks:
+      - host
+    ports:      
+        - 3600:3600   
+  wordpress:
+    #image: wordpress:php7.3-fpm-alpine    
+    build: ./requirements/wordpress
+    ports:      
+        - 9000:9000    
+    volumes:
+     # - /data/html:/var/www/html    
+        - wp:/var/www/html    
+    depends_on:      
+         mysql:    
+          condition: service_healthy
+         redis:  
+          condition: service_started
+            ### https://stackoverflow.com/questions/31746182/docker-compose-wait-for-container-x-before-starting-y
+    environment:      
+        WORDPRESS_DB_HOST:      $WORDPRESS_DB_HOST
+        MYSQL_ROOT_PASSWORD:    $MYSQL_ROOT_PASSWORD
+        WORDPRESS_DB_NAME:      $WORDPRESS_DB_NAME
+        WORDPRESS_DB_USER:      $WORDPRESS_DB_USER
+        WORDPRESS_DB_PASSWORD:  $WORDPRESS_DB_PASSWORD
+        WORDPRESS_TABLE_PREFIX: $WORDPRESS_TABLE_PREFIX
+    networks:
+      - host
+    #links:      
+    #    - mysql    
+    restart: always  #/////////// uncomment 
+  nginx:
+    #image: nginx:alpine    
+    build: ./requirements/nginx
+    volumes:
+        - wp:/var/www/html    
+        #- /data/html:/var/www/html
+#        - ./srcs/nginx:/etc/nginx/conf.d      
+    ports:      
+        - 80:80    
+        - 443:443    
+    networks:
+      - host
+    depends_on:      
+        wordpress:  
+          condition: service_started
+    #links:      
+    #    - wordpress
+  ftp:
+    build: ./requirements/bonus/ftp
+    volumes:
+        - wp:/ftp    
+    ports:      
+        - "21:21"    
+        - "21000:21000"    
+        - "21001:21001"    
+    networks:
+      - host
+    depends_on:      
+        wordpress:  
+          condition: service_started
+  redis:
+    build: ./requirements/bonus/redis
+    volumes:
+        - wp:/var/www/html    
+    networks:
+      - host
+    ports:
+        - 6379:6379
+networks:
+  host:
+volumes:
+  wp:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/home/mehtel/data/wp'
+  db: 
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/home/mehtel/data/db'
